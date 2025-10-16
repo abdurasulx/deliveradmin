@@ -1,0 +1,336 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Yetkazib beruvchi paneli</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <style>
+    body {
+      background-color: #f8f9fa;
+      font-family: 'Segoe UI', sans-serif;
+    }
+
+    /* === Sidebar === */
+    .sidebar {
+      height: 100vh;
+      width: 240px;
+      position: fixed;
+      left: 0;
+      top: 0;
+      background: #0d6efd;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      z-index: 1000;
+      transition: all 0.3s ease;
+    }
+    .sidebar h4 {
+      padding: 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.3);
+      text-align: center;
+    }
+    .sidebar a {
+      padding: 15px 20px;
+      text-decoration: none;
+      color: white;
+      display: block;
+    }
+    .sidebar a:hover, .sidebar a.active {
+      background: rgba(255,255,255,0.2);
+    }
+
+    /* === Content === */
+    .content {
+      margin-left: 240px;
+      padding: 20px;
+      transition: all 0.3s ease;
+    }
+    .hidden { display: none; }
+
+    .order-card {
+      border: 1px solid #dee2e6;
+      border-left: 5px solid #0d6efd;
+      border-radius: 6px;
+      background: #fff;
+      margin-bottom: 15px;
+      padding: 15px;
+      transition: all 0.3s ease;
+    }
+    .order-card.delivered { border-left-color: #198754; background: #e9f9ee; }
+    .order-card.canceled { border-left-color: #dc3545; background: #fdeaea; }
+
+    .footer {
+      text-align: center;
+      padding: 15px;
+      font-size: 14px;
+      color: gray;
+      border-top: 1px solid #dee2e6;
+      margin-top: 40px;
+    }
+
+    @media (max-width: 992px) {
+      .sidebar { left: -240px; }
+      .sidebar.show { left: 0; }
+      .content { margin-left: 0; padding: 15px; }
+      .toggle-btn { display: inline-block; }
+    }
+    @media (min-width: 993px) { .toggle-btn { display: none; } }
+  </style>
+</head>
+<body>
+
+<!-- === Sidebar === -->
+<div class="sidebar" id="sidebar">
+  <h4>🚚 Yetkazib beruvchi</h4>
+  <a href="#" class="menu-link active" data-page="home">Bosh sahifa</a>
+  <a href="#" class="menu-link" data-page="orders">Buyurtmalar</a>
+  <a href="#" class="menu-link" data-page="profile">Profil</a>
+  <a href="{% url 'logout' %}" class="text-danger mt-auto p-3">🚪 Chiqish</a>
+</div>
+
+<!-- === Content === -->
+<div class="content">
+  <nav class="navbar navbar-light bg-white mb-3 shadow-sm rounded d-flex justify-content-between align-items-center">
+    <button class="btn btn-outline-primary toggle-btn" id="toggleSidebar">☰</button>
+    <span class="navbar-brand mb-0 h5">👋 Salom, {{ request.user.first_name }}!</span>
+  </nav>
+
+  <!-- Bosh sahifa -->
+  <div id="home-page">
+    <h3>Bosh sahifa</h3>
+    <hr>
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="card shadow-sm text-center"><div class="card-body"><h5>📦 Faol</h5><h3>{{ active_orders_count }}</h3></div></div>
+      </div>
+      <div class="col-md-4">
+        <div class="card shadow-sm text-center"><div class="card-body"><h5>✅ Yetkazilgan</h5><h3 id = "delivered_orders_count" >{{ delivered_orders_count }}</h3></div></div>
+      </div>
+      <div class="col-md-4">
+        <div class="card shadow-sm text-center"><div class="card-body"><h5>❌ Bekor qilingan</h5><h3 id = "canceled_orders_count" >{{ canceled_orders_count }}</h3></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Buyurtmalar -->
+  <div id="orders-page" class="hidden">
+    <h3>Buyurtmalar</h3>
+    <hr>
+
+    <h5 class="text-primary">🚚 Yetkazilayotganlar</h5>
+    <div id="delivering-orders">
+      {% for order in delivering_orders %}
+      <div class="order-card" id="order-{{ order.id }}">
+        <h6><b>{{ order.customer_name }}</b> — {{ order.delivery_address }}</h6>
+        <p>{{ order.total_price }} so‘m | {{ order.created_at|date:"d.m.Y H:i" }}</p>
+        <span class="badge bg-warning text-dark">Yetkazilmoqda</span>
+        <div class="mt-2">
+          <button class="btn btn-success btn-sm deliver-btn w-100" data-id="{{ order.id }}">✅ Topshirish</button>
+        </div>
+      </div>
+      {% empty %}
+        <p>Hozircha faol buyurtmalar yo‘q.</p>
+      {% endfor %}
+    </div>
+
+    <h5 class="text-success mt-4">✅ Yetkazib berilganlar</h5>
+    <div id="delivered-orders">
+      {% for order in delivered_orders %}
+      <div class="order-card delivered">
+        <h6><b>{{ order.customer_name }}</b> — {{ order.address }}</h6>
+        <p>{{ order.total_price }} so‘m | {{ order.updated_at|date:"d.m.Y H:i" }}</p>
+        <span class="badge bg-success">Yetkazib berilgan</span>
+      </div>
+      {% empty %}
+        <p>Hali topshirilgan buyurtmalar yo‘q.</p>
+      {% endfor %}
+    </div>
+
+    <h5 class="text-danger mt-4">❌ Bekor qilinganlar</h5> 
+    {% for order in canceled_orders %}
+      <div class="order-card canceled">
+        <h6><b>{{ order.customer_name }}</b> — {{ order.address }}</h6>
+        <p>{{ order.total_price }} so‘m | {{ order.updated_at|date:"d.m.Y H:i" }}</p>
+        <span class="badge bg-danger">Bekor qilingan</span>
+      </div>
+    {% empty %}
+      <p>Bekor qilingan buyurtmalar mavjud emas.</p>
+    {% endfor %}
+  </div>
+
+  <!-- Profil -->
+  <div id="profile-page" class="hidden">
+    <h3>Profil</h3>
+    <hr>
+    <div class="card shadow-sm p-3 mb-3">
+      <p><b>Ism:</b> {{ request.user.first_name }}</p>
+      <p><b>Familiya:</b> {{ request.user.last_name }}</p>
+      <p><b>Login:</b> {{ request.user.username }}</p>
+      <p><b>Email:</b> {{ request.user.email }} {{ deliver.id }} </p>
+    </div>
+    <a href="{% url 'logout' %}" class="btn btn-danger w-100">🚪 Chiqish</a>
+  </div>
+
+  <div class="footer">© {{ now|date:"Y" }} Yetkazib beruvchi tizimi</div>
+</div>
+
+<script>
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+      cookie = cookie.trim();
+      if (cookie.startsWith(name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+// === Sidebar toggle ===
+const sidebar = document.getElementById('sidebar');
+const toggleSidebar = document.getElementById('toggleSidebar');
+
+toggleSidebar.addEventListener('click', () => {
+  sidebar.classList.toggle('show');
+});
+
+// Sidebar tashqarisiga bosilganda yopish (faqat mobil holatda)
+document.addEventListener('click', (e) => {
+  if (window.innerWidth < 992 && sidebar.classList.contains('show')) {
+    if (!sidebar.contains(e.target) && !toggleSidebar.contains(e.target)) {
+      sidebar.classList.remove('show');
+    }
+  }
+});
+
+// === Navigatsiya ===
+document.querySelectorAll('.menu-link').forEach(link => {
+  link.addEventListener('click', e => {
+    e.preventDefault();
+    document.querySelectorAll('.menu-link').forEach(l => l.classList.remove('active'));
+    link.classList.add('active');
+    const page = link.dataset.page;
+    document.querySelectorAll('#home-page, #orders-page, #profile-page').forEach(p => p.classList.add('hidden'));
+    document.getElementById(`${page}-page`).classList.remove('hidden');
+  });
+});
+
+// === Buyurtma topshirish ===
+function addDeliverButtonListeners() {
+  document.querySelectorAll('.deliver-btn').forEach(btn => {
+    btn.onclick = async () => {
+      const orderId = btn.dataset.id;
+      console.log(orderId);
+      try {
+        const res = await fetch('/update_order_status/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+          },
+          body: JSON.stringify({ order_id: orderId, status: 'accepted' })
+        });
+        const data = await res.json();
+        if (data.success) {
+          const card = document.getElementById(`order-${orderId}`);
+          card.classList.add('delivered');
+          const badge = card.querySelector('.badge');
+          badge.classList.remove('bg-warning', 'text-dark');
+          badge.classList.add('bg-success');
+          badge.textContent = 'Yetkazib berilgan';
+          card.querySelector('.mt-2')?.remove();
+          document.getElementById('delivered-orders').prepend(card);
+        } else {
+          alert("Xatolik: " + data.error);
+        }
+      } catch (err) {
+        console.error("Xato:", err);
+      }
+    };
+  });
+}
+
+// === Har 1 sekundda buyurtmalarni yangilash ===
+async function fetchOrders() {
+  const delid = {{ deliver.id }};
+  try {
+    const res = await fetch(`/api/orders/${delid}/`);
+    const data = await res.json();
+    if (!Array.isArray(data)) return;
+
+    const delivering = document.getElementById('delivering-orders');
+    const delivered = document.getElementById('delivered-orders');
+    delivering.innerHTML = '';
+    delivered.innerHTML = '';
+    let submittedCount = 0;
+    let acceptedCount = 0;
+    let canceledCount = 0;
+    data.forEach(order => {
+      const name = order.orderlist__customer_name || 'Nomaʼlum mijoz';
+      const address = order.delivery_address || 'Manzil kiritilmagan';
+      const date = new Date(order.created_at).toLocaleString('uz-UZ');
+      const card = document.createElement('div');
+      card.classList.add('order-card');
+      card.id = `order-${order.id}`;
+
+      if (order.status === 'submitted') {
+        submittedCount++;
+        card.innerHTML = `
+          <h6><b>${name}</b> — ${address}</h6>
+          <p>${date}</p>
+          <span class="badge bg-warning text-dark">Yetkazilmoqda</span>
+          <div class="mt-2">
+            <button class="btn btn-success btn-sm deliver-btn w-100" data-id="${order.id}">✅ Topshirish</button>
+          </div>
+        `;
+        delivering.appendChild(card);
+      } else if (order.status === 'accepted') {
+        acceptedCount++;
+        card.classList.add('delivered');
+        card.innerHTML = `
+          <h6><b>${name}</b> — ${address}</h6>
+          <p>${date}</p>
+          <span class="badge bg-success">Yetkazib berilgan</span>
+        `;
+        delivered.appendChild(card);
+      }
+      else if (order.status === 'rejected') {
+        canceledCount++;
+        card.classList.add('canceled');
+        card.innerHTML = `
+          <h6><b>${name}</b> — ${address}</h6>
+          <p>${date}</p>
+          <span class="badge bg-danger">Bekor qilingan</span>
+        `;
+        delivered.appendChild(card);
+      }
+    });
+    //document.querySelector('card-body h3').textContent = submittedCount;
+    console.log(submittedCount,' ',acceptedCount,' ',canceledCount);
+    document.getElementById('home-page').querySelector('.card:nth-child(1) h3').textContent = submittedCount;
+    document.getElementById('delivered_orders_count').textContent = acceptedCount;
+    document.getElementById('canceled_orders_count').textContent = canceledCount;
+   // document.getElementById('home-page').querySelector('.card:nth-child(3) h3').textContent = canceledCount;
+    //document.querySelector('#home-page .card:nth-child(2) h3').textContent = acceptedCount;
+    //document.querySelector('#home-page .card:nth-child(3) h3').textContent = canceledCount;
+    
+
+    addDeliverButtonListeners();
+  } catch (err) {
+    console.error('Buyurtmalarni yuklashda xato:', err);
+  }
+}
+
+setInterval(fetchOrders, 1000);
+</script>
+
+</body>
+</html>

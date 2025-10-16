@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block title %}Hodimlar{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>👥 Hodimlar ro‘yxati</h3>
+    <a href="{% url 'employee_add' %}" class="btn btn-primary">+ Yangi hodim</a>
+</div>
+
+<table class="table table-bordered table-hover align-middle">
+    <thead class="table-light">
+        <tr>
+            <th>#</th>
+            <th>Ism Familiya</th>
+            <th>Telefon</th>
+            <th>Rol</th>
+            <th>Holat</th>
+            <th>Amallar</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for emp in employees %}
+        <tr>
+            <td>{{ forloop.counter }}</td>
+            <td>{{ emp.user.first_name }} {{ emp.user.last_name }}</td>
+            <td>{{ emp.phone }}</td>
+            <td>{{ emp.get_role_display }}</td>
+            <td>
+                {% if emp.is_activ %}
+                <span class="badge bg-success">Faol</span>
+                {% else %}
+                <span class="badge bg-secondary">Nofaol</span>
+                {% endif %}
+            </td>
+            <td>
+                <a href="{% url 'employee_edit' emp.pk %}" class="btn btn-sm btn-warning">Tahrirlash</a>
+                <a href="{% url 'employee_delete' emp.pk %}" class="btn btn-sm btn-danger"
+                   onclick="return confirm('Haqiqatan ham o‘chirilsinmi?')">O‘chirish</a>
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center text-muted">Hozircha hodim yo‘q.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

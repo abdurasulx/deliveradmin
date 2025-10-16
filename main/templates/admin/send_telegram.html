@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+  <h4 class="mb-3">📢 Telegram Reklama Jo‘natish</h4>
+
+  <div class="card p-4 shadow-sm">
+    <form id="sendTelegramForm" enctype="multipart/form-data">
+      {% csrf_token %}
+      <div class="mb-3">
+        <label class="form-label">🤖 Bot Token</label>
+        <input type="text" name="bot_token" class="form-control" placeholder="Bot tokenni kiriting..." required>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">✍️ Xabar matni</label>
+        <textarea name="message" rows="4" class="form-control" placeholder="Reklama matnini kiriting..." required></textarea>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">🖼️ Rasm (ixtiyoriy)</label>
+        <input type="file" name="image" accept="image/*" class="form-control">
+      </div>
+
+      <button type="submit" class="btn btn-primary w-100">🚀 Jo‘natish</button>
+    </form>
+  </div>
+
+  <div id="result" class="mt-3 text-center fw-bold"></div>
+</div>
+
+<script>
+document.getElementById('sendTelegramForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+
+  const formData = new FormData(this);
+  const resultDiv = document.getElementById('result');
+  resultDiv.textContent = "⏳ Jo‘natilmoqda...";
+
+  const response = await fetch("{% url 'send_telegram_message' %}", {
+    method: 'POST',
+    body: formData,
+    headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+  });
+
+  const data = await response.json();
+  if (data.success) {
+    resultDiv.textContent = `✅ ${data.count} ta foydalanuvchiga yuborildi.`;
+  } else {
+    resultDiv.textContent = `❌ Xatolik: ${data.error}`;
+  }
+});
+</script>
+{% endblock %}

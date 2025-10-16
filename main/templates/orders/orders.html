@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2 class="mb-4 text-center">📦 Buyurtmalar holati</h2>
+
+  <div class="row">
+    <!-- Pending -->
+    <div class="col-md-6 mb-4">
+      <div class="card border-warning">
+        <div class="card-header bg-warning text-dark fw-bold">⏳ Yuklanmoqda</div>
+        <div class="card-body" id="pendingOrders">
+          <p class="text-muted">Ma'lumot yuklanmoqda...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Submitted -->
+    <div class="col-md-6 mb-4">
+      <div class="card border-primary">
+        <div class="card-header bg-primary text-white fw-bold">🚚 Yetkazilmoqda</div>
+        <div class="card-body" id="submittedOrders">
+          <p class="text-muted">Ma'lumot yuklanmoqda...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Accepted -->
+    <div class="col-md-6 mb-4">
+      <div class="card border-success">
+        <div class="card-header bg-success text-white fw-bold">✅ Topshirildi</div>
+        <div class="card-body" id="acceptedOrders">
+          <p class="text-muted">Ma'lumot yuklanmoqda...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rejected -->
+    <div class="col-md-6 mb-4">
+      <div class="card border-danger">
+        <div class="card-header bg-danger text-white fw-bold">❌ Bekor qilingan</div>
+        <div class="card-body" id="rejectedOrders">
+          <p class="text-muted">Ma'lumot yuklanmoqda...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- JavaScript (Auto-refresh) -->
+<script>
+  function loadOrders() {
+    fetch("{% url 'order_status_data' %}")
+      .then(response => response.json())
+      .then(data => {
+        // Har bir toifani yangilash
+        updateSection('pendingOrders', data.pending);
+        updateSection('submittedOrders', data.submitted);
+        updateSection('acceptedOrders', data.accepted);
+        updateSection('rejectedOrders', data.rejected);
+      })
+      .catch(error => {
+        console.error("Xatolik:", error);
+      });
+  }
+
+  function updateSection(elementId, orders) {
+    const container = document.getElementById(elementId);
+    container.innerHTML = ''; // eski ma'lumotni tozalash
+
+    if (orders.length === 0) {
+      container.innerHTML = '<p class="text-muted">Buyurtma yo‘q.</p>';
+      return;
+    }
+
+    orders.forEach(order => {
+      const card = document.createElement('div');
+      card.classList.add('border', 'rounded', 'p-2', 'mb-2', 'bg-light');
+      card.innerHTML = `
+        <p class="mb-1"><strong>ID:</strong> ${order.id}</p>
+        <p class="mb-1"><strong>Mijoz:</strong> ${order.client}</p>
+        <p class="mb-1"><strong>Manzil:</strong> ${order.delivery_address}</p>
+        <p class="mb-0"><strong>Yuklovchi:</strong> ${order.deliver || '—'}</p>
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  // Dastlabki yuklash
+  loadOrders();
+  // Har 5 soniyada yangilab turish
+  setInterval(loadOrders, 5000);
+</script>
+<!-- 🚚 Yetkazib beruvchi tanlash oynasi -->
+<div class="modal fade" id="assignModal" tabindex="-1" aria-labelledby="assignModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="{% url 'assign_order' %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="assignModalLabel">Topshirish uchun yetkazib beruvchini tanlang</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Yopish"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="order_id" id="orderIdInput">
+
+          <div class="mb-3">
+            <label class="form-label">Yetkazib beruvchi:</label>
+            <select name="deliver_id" class="form-select" required>
+              <option value="">Tanlang...</option>
+              {% for emp in suppliers %}
+                <option value="{{ emp.id }}">{{ emp.user.first_name }} {{ emp.user.last_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Bekor qilish</button>
+          <button type="submit" class="btn btn-success">✅ Topshirish</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Modal ochilganda order ID ni inputga yozamiz
+  document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.assign-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        document.getElementById('orderIdInput').value = this.dataset.orderId;
+      });
+    });
+  });
+</script>
+
+{% endblock %}

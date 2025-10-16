@@ -1,0 +1,157 @@
+{% extends 'base.html' %}
+{% block title %}Mahsulotlar{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="h4">🍔 Mahsulotlar ro‘yxati</h2>
+  <!-- Qo‘shish tugmasi -->
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProductModal">
+    ➕ Yangi mahsulot
+  </button>
+</div>
+
+<!-- 🔹 Jadval -->
+<div class="table-responsive shadow-sm">
+  <table class="table align-middle table-bordered table-hover">
+    <thead class="table-dark">
+      <tr>
+        <th>#</th>
+        <th>Nomi</th>
+        <th>Kategoriya</th>
+        <th>Narx (so‘m)</th>
+        <th>Soni</th>
+        <th>Faol</th>
+        <th>Amallar</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for product in products %}
+      <tr>
+        <td>{{ forloop.counter }}</td>
+        <td>{{ product.name }}</td>
+        <td>{{ product.category.name }}</td>
+        <td>{{ product.price|floatformat:2 }}</td>
+        <td>{{ product.count }}</td>
+        <td>
+          {% if product.is_active %}
+            <span class="badge bg-success">Ha</span>
+          {% else %}
+            <span class="badge bg-danger">Yo‘q</span>
+          {% endif %}
+        </td>
+        <td>
+          <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editModal{{ product.id }}">✏️</button>
+          <a href="{% url 'delete_product' product.id %}" class="btn btn-sm btn-danger" onclick="return confirm('O‘chirishni tasdiqlaysizmi?')">🗑️</a>
+        </td>
+      </tr>
+
+      <!-- ✏️ Tahrirlash modali -->
+      <div class="modal fade" id="editModal{{ product.id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <form method="POST" enctype="multipart/form-data" action="{% url 'edit_product' product.id %}">
+              {% csrf_token %}
+              <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title">Mahsulotni tahrirlash</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                <div class="mb-3">
+                  <label class="form-label">Nomi</label>
+                  <input type="text" name="name" class="form-control" value="{{ product.name }}" required>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Narx</label>
+                  <input type="number" step="0.01" name="price" class="form-control" value="{{ product.price }}" required>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Soni</label>
+                  <input type="number" name="count" class="form-control" value="{{ product.count }}">
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="is_active" id="active{{ product.id }}" {% if product.is_active %}checked{% endif %}>
+                  <label class="form-check-label" for="active{{ product.id }}">Faol</label>
+                </div>
+              </div>
+                <div class="mb-3">
+                <label for="productImage" class="form-label">Mahsulot rasmi</label>
+                <input type="file" class="form-control" id="productImage" name="image" accept="image/*"   >
+                <div class="form-text">Faqat rasm fayllari (.jpg, .png, .jpeg) qabul qilinadi.</div>
+              </div>
+              <div class="modal-footer">
+                <button type="submit" class="btn btn-success">Saqlash</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Bekor qilish</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+      {% empty %}
+      <tr>
+        <td colspan="7" class="text-center text-muted">Hech qanday mahsulot topilmadi.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- ➕ Qo‘shish modali -->
+<div class="modal fade" id="addProductModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" enctype="multipart/form-data" action="{% url 'add_product' %}">
+        {% csrf_token %}
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title">Yangi mahsulot qo‘shish</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Nomi</label>
+            <input type="text" name="name" class="form-control" placeholder="Masalan, Lavash Maxsus" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Kategoriya</label>
+            <select name="category" class="form-select">
+              {% for category in categories %}
+                <option value="{{ category.id }}">{{ category.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Narx (so‘m)</label>
+            <input type="number" step="0.01" name="price" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Soni</label>
+            <input type="number" name="count" class="form-control">
+          </div>
+        
+          <!-- detail   -->
+          <div class="mb-3">
+            <label class="form-label">Tavsif</label>
+            <textarea name="detail" class="form-control" rows="3"></textarea>
+          </div>
+
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="is_active" id="isActiveAdd" checked>
+            <label class="form-check-label" for="isActiveAdd">Faol</label>
+          </div>
+
+                  <div class="mb-3">
+          <label for="productImage" class="form-label">Mahsulot rasmi</label>
+          <input type="file" class="form-control" id="productImage" name="image" accept="image/*" required>
+          <div class="form-text">Faqat rasm fayllari (.jpg, .png, .jpeg) qabul qilinadi.</div>
+        </div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-success">Qo‘shish</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Bekor qilish</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

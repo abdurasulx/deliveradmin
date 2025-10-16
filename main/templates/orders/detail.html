@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block title %}Buyurtma #{{ order.id }}{% endblock %}
+{% block content %}
+
+<div class="container mt-4">
+  <div class="card shadow-sm border-0">
+    <div class="card-header bg-primary text-white">
+      <h5>Buyurtma #{{ order.id }}</h5>
+    </div>
+    <div class="card-body">
+      <p><strong>Mijoz:</strong> {{ order.client }}</p>
+      <p><strong>Yetkazuvchi:</strong> {% if order.deliver %}{{ order.deliver.user.first_name }}{% else %}<em>Belgilanmagan</em>{% endif %}</p>
+      <p><strong>Manzil:</strong> {{ order.delivery_address }}</p>
+      <p><strong>Holat:</strong>
+        {% if order.status == 'pending' %}
+          <span class="badge bg-warning text-dark">Yuklanmoqda</span>
+        {% elif order.status == 'submitted' %}
+          <span class="badge bg-primary">Topshirilgan</span>
+        {% elif order.status == 'accepted' %}
+          <span class="badge bg-success">Qabul qilingan</span>
+        {% else %}
+          <span class="badge bg-danger">Bekor qilingan</span>
+        {% endif %}
+      </p>
+      <p><strong>Yaratilgan:</strong> {{ order.created_at|date:"d.m.Y H:i" }}</p>
+      <p><strong>Yangilangan:</strong> {{ order.updated_at|date:"d.m.Y H:i" }}</p>
+
+      <a href="{% url 'conorders_list' %}" class="btn btn-secondary btn-sm">⬅ Orqaga</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

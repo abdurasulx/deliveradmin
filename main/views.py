@@ -105,10 +105,12 @@ def products_view(request):
     if request.method == "POST" and 'name' in request.POST:
         prd=Product.objects.create(
             name=request.POST['name'],
+            description=request.POST.get('detail', ''),
             category_id=request.POST.get('category'),
             price=request.POST.get('price'),
             count=request.POST.get('count') or 0,
             is_active='is_active' in request.POST
+
         )
         pi=ProductImage.objects.create(
             product=prd,

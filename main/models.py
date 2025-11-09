@@ -11,6 +11,42 @@ class Category(models.Model):
     def __str__(self):
         return self.name
     
+class DeleviryType(models.TextChoices):
+    STANDART = 'standart', 'STANDART'
+    INDUVIDIAL = 'induvidial', 'INDUVIDIAL'
+class OrderStatus(models.TextChoices):
+    NEW = 'new', 'Yangi'
+    PENDING = 'pending', 'Kutilmoqda'
+    PROCESSING = 'processing', 'Jarayonda'
+    OUT_FOR_DELIVERY = 'out_for_delivery', 'Yetkazib berilmoqda'
+    DELIVERED = 'delivered', 'Yetkazildi'
+    CANCELLED = 'cancelled', 'Bekor qilingan'
+
+class Order(models.Model):
+    store = models.ForeignKey(User, on_delete=models.CASCADE,blank=True, null=True)
+    customer = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='customer_orders')
+    delivery_person = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='delivery_orders')
+
+    customer_name = models.CharField(max_length=255)
+    phone_number = models.CharField(max_length=20, null=True, blank=True) 
+    region = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True , related_name='region')  
+    district = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True , related_name='district')
+    deleviry_type = models.CharField(max_length=20, choices=DeleviryType.choices, blank=True)
+    address = models.TextField(blank=True)
+    # Location coordinates
+    latitude = models.DecimalField(max_digits=20, decimal_places=16, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=20, decimal_places=16, null=True, blank=True)
+
+    status = models.CharField(max_length=50, default=OrderStatus.NEW, choices=OrderStatus.choices)
+    payment_method = models.CharField(max_length=50, null=True, blank=True)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+    delivery_person_comment = models.TextField(blank=True)
+    deleviry_paid = models.BooleanField(default=False)
+    delevery_date = models.DateField(null=True, blank=True)
+    delevery_time = models.TimeField(null=True, blank=True)
+    
 class Customer(models.Model):
     telegram_id = models.BigIntegerField(unique=True)
     first_name = models.CharField(max_length=100, null=True, blank=True)
@@ -55,12 +91,13 @@ class Product(models.Model):
     name_krill = models.CharField(max_length=150, null=True, blank=True)
     description_krill = models.TextField(null=True, blank=True)
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)  # Django modelini to‘g‘ri init qilish
-        if self.name or ( not self.name_krill):
-            self.name_krill = transliterate_to_krill(self.name)
-        if self.description or ( not self.description_krill):
-            self.description_krill = transliterate_to_krill(self.description)
+    def save(self, *args, **kwargs):
+            if self.name and not self.name_krill:
+                self.name_krill = transliterate_to_krill(self.name)
+            if self.description and not self.description_krill:
+                self.description_krill = transliterate_to_krill(self.description)
+            super().save(*args, **kwargs)
+
     def __str__(self):
         
         return self.name
@@ -72,31 +109,6 @@ class ProductImage(models.Model):
     image = models.ImageField(upload_to='product_images/')
     created_at = models.DateTimeField(auto_now_add=True)
 
-class Order(models.Model):
-    product = models.ForeignKey(Product, null=True, blank=True, on_delete=models.SET_NULL)
-    customer = models.ForeignKey(Customer, null=True, blank=True, on_delete=models.SET_NULL)
-
-    customer_name = models.CharField(max_length=255)
-    phone_number = models.CharField(max_length=20, null=True, blank=True) 
-    
-    address = models.TextField()
-    # Location coordinates
-    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-
-    status = models.CharField(max_length=50, default='pending')
-    payment_method = models.CharField(max_length=50, null=True, blank=True)
-    amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    paid_at = models.DateTimeField(null=True, blank=True)
-
-class OrderItem(models.Model):
-    order = models.ForeignKey(Order, on_delete=models.CASCADE)
-    product = models.ForeignKey(Product, null=True, blank=True, on_delete=models.SET_NULL)
-    quantity = models.IntegerField(default=1)
-    price = models.DecimalField(max_digits=10, decimal_places=2)
-    total_price = models.DecimalField(max_digits=10, decimal_places=2)
-    created_at = models.DateTimeField(auto_now_add=True)
 
 class Employee(models.Model):
     ROLE_CHOICES = [
@@ -123,3 +135,10 @@ class ConOrder(models.Model):
     deliver=models.ForeignKey(Employee, null=True, blank=True, on_delete=models.SET_NULL)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+class OrderItem(models.Model):
+        order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
+        product = models.ForeignKey(Product, null=True, blank=True, on_delete=models.SET_NULL)
+        quantity = models.IntegerField(default=1)
+        price = models.DecimalField(max_digits=10, decimal_places=2)
+        total_price = models.DecimalField(max_digits=10, decimal_places=2)
+        created_at = models.DateTimeField(auto_now_add=True)

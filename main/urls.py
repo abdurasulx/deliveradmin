@@ -21,7 +21,7 @@ urlpatterns = [
     path('conorders/<int:pk>/update_status/', views.conorder_update_status, name='conorder_update_status'),
     path('conorders/add/', views.conorder_create, name='conorder_create'),
     path('conorders/<int:pk>/delete/', views.conorder_delete, name='conorder_delete'),
-    path('orders/', views.orders_view, name='orders_view'),
+    path('order/', views.orders_view, name='orders_view'),
     path('orders/data/', views.order_status_data, name='order_status_data'),
     path('orders/status/', views.order_status_data, name='order_status_data'),
     path('conorders/assign/', views.assign_order, name='assign_order'),
@@ -34,6 +34,9 @@ urlpatterns = [
     path('telegram/send/', views.send_telegram_message, name='send_telegram_message'),
     path('api/orders/<int:deliver_id>/', views.get_orders_api, name='get_orders_api'),
     path('api/all_orders/', views.all_orders_api, name='all_orders_api'),
+    path('profile',views.profile,name='profile'),
+    path('order/<int:pk>/detail/', views.order_detail_json, name='order_detail_json'),
+    path('order/history',views.order_history,name='order_history'),
 
 
 ] 

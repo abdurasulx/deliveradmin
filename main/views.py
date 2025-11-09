@@ -1,7 +1,7 @@
 from django.shortcuts import render
 # import htttp response 
 from django.http import HttpResponse
-from .models import Product, Category, ProductImage, Order, OrderItem, Employee, User  , ConOrder , Customer
+from .models import Product, Category, ProductImage, Order, OrderItem, Employee, User  , ConOrder , Customer, OrderStatus
 from django.shortcuts import get_object_or_404, redirect
 from django.contrib import messages
 from django import forms
@@ -12,6 +12,11 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.admin.views.decorators import staff_member_required
 from django.views.decorators.csrf import csrf_exempt
 import requests
+from django.utils import timezone
+from .forms import EmployeeProfileForm
+
+from django.core.paginator import Paginator
+from django.db.models.functions import TruncDate
 
 
 def login_view(request):
@@ -41,20 +46,21 @@ def home(request):
     if usr.role == 'manager':
         return render(request, 'dashboard.html', {'next': 'home'})
     elif usr.role == 'supplier':
-        delivering_orders = ConOrder.objects.filter(deliver=usr, status='submitted')
-        delivered_orders = ConOrder.objects.filter(deliver=usr, status='accepted')
-        canceled_orders = ConOrder.objects.filter(deliver=usr, status='canceled')
+        today=timezone.now().date()
+        delivering_orders = Order.objects.filter(status=OrderStatus.OUT_FOR_DELIVERY, delivery_person=request.user)
+        delivered_orders = Order.objects.filter(status=OrderStatus.DELIVERED, delivery_person=request.user, delevery_date=today)
+        canceled_orders = Order.objects.filter(status=OrderStatus.CANCELLED, delivery_person=request.user, delevery_date=today)
 
         context = {
-        'active_orders_count': delivering_orders.count(),
-        'delivered_orders_count': delivered_orders.count(),
-        'canceled_orders_count': canceled_orders.count(),
-        'delivering_orders': delivering_orders,
-        'delivered_orders': delivered_orders,
-        'canceled_orders': canceled_orders,
-        'deliver': usr
+            'active_orders_count': len(delivering_orders),
+            'delivered_orders_count': len(delivered_orders),
+            'canceled_orders_count': len(canceled_orders),
+            'delivering_orders': delivering_orders,
+            'delivered_orders': delivered_orders,
+            'canceled_orders': canceled_orders,
+             }
 
-    }
+    # }
         
 
         return render(request, 'deliver/dashboart.html', context)
@@ -380,20 +386,17 @@ def order_status_data(request):
         'rejected': rejected
     })
 @login_required(login_url='login')
-@staff_member_required
-def orders_view(request):
-    pending_orders = ConOrder.objects.filter(status='pending')
-    submitted_orders = ConOrder.objects.filter(status='submitted')
-    accepted_orders = ConOrder.objects.filter(status='accepted')
-    rejected_orders = ConOrder.objects.filter(status='rejected')
-    suppliers = Employee.objects.filter(role='supplier', is_activ=True)
 
-    return render(request, 'orders/orders.html', {
-        'pending_orders': pending_orders,
-        'submitted_orders': submitted_orders,
-        'accepted_orders': accepted_orders,
-        'rejected_orders': rejected_orders,
-        'suppliers': suppliers
+def orders_view(request):
+    
+    active_orders = Order.objects.filter(status=OrderStatus.OUT_FOR_DELIVERY)
+    delivered_orders = Order.objects.filter(status=OrderStatus.DELIVERED)
+    canceled_orders = Order.objects.filter(status=OrderStatus.CANCELLED)
+
+    return render(request, 'deliver/orders.html', {
+        'active_orders': active_orders,
+        'delivered_orders': delivered_orders,
+        'canceled_orders': canceled_orders,
     })
 
 @login_required(login_url='login')
@@ -429,27 +432,7 @@ def assign_deliver(request):
         return JsonResponse({'success': False, 'error': 'Yetkazib beruvchi topilmadi!'})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
-@csrf_exempt
-@login_required
-def update_order_status(request):
-    if request.method == 'POST':
-        try:
-            import json
-            data = json.loads(request.body.decode('utf-8'))
-            order_id = data.get('order_id')
-            status = data.get('status')
 
-            order = ConOrder.objects.get(id=order_id)
-            order.status = status
-            order.save()
-
-            return JsonResponse({'success': True, 'status': status})
-        except Order.DoesNotExist:
-            return JsonResponse({'success': False, 'error': 'Buyurtma topilmadi'}, status=404)
-        except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)}, status=400)
-    else:
-        return JsonResponse({'success': False, 'error': 'POST so‘rov kutilgan'}, status=405)
 @csrf_exempt
 def send_telegram_message(request):
     if request.method == "GET":
@@ -491,7 +474,129 @@ def get_orders_api(request,deliver_id):
     
     return JsonResponse(list(orders), safe=False)
 @login_required(login_url='login')
-@staff_member_required
+# @staff_member_required
 def all_orders_api(request):
-    orders = ConOrder.objects.all().values('id', 'orderlist__customer_name', 'delivery_address', 'status', 'created_at')
-    return JsonResponse(list(orders), safe=False)
+    import json
+    pending = list(ConOrder.objects.filter(status='pending').values())
+    submitted = list(ConOrder.objects.filter(status='submitted').values())
+    accepted = list(ConOrder.objects.filter(status='accepted').values())
+    rejected = list(ConOrder.objects.filter(status='rejected').values())
+
+    data = {
+        'pending': pending,
+        'submitted': submitted,
+        'accepted': accepted,
+        'rejected': rejected
+    }
+
+    return JsonResponse(data, safe=True)
+    
+
+    # Agar POST bo‘lmasa
+    return JsonResponse({'success': False, 'message': 'Faqat POST so‘rovlar qo‘llaniladi.'})
+
+    # 🔹 3. Boshqa metodlar uchun javob
+   
+
+@login_required(login_url='login')  # login sahifasiga yo‘naltiradi
+def profile(request):
+    employee = request.user.employee  # endi bu faqat login bo‘lgan userlarda ishlaydi
+    
+    if request.method == 'POST':
+        form = EmployeeProfileForm(request.POST, instance=employee)
+        if form.is_valid():
+            employee = form.save(commit=False)
+            # Agar parol kiritilgan bo‘lsa — yangilaymiz
+            if form.cleaned_data.get('password'):
+                request.user.set_password(form.cleaned_data['password'])
+                request.user.save()
+            employee.save()
+            return redirect('home')
+    else:
+        form = EmployeeProfileForm(instance=employee)
+    
+    return render(request, 'deliver/profile.html', {'form': form})
+
+def order_detail_json(request, pk):
+    order = get_object_or_404(Order, pk=pk)
+    items = []
+    for it in order.items.all():
+        items.append({
+            "product_name": it.product.name if it.product else "Noma'lum",
+            "quantity": it.quantity,
+            "price": str(it.price),
+            "total_price": str(it.total_price),
+        })
+    total = sum([float(it['total_price']) for it in items]) if items else 0
+    return JsonResponse({
+        "order": {
+            "id": order.id,
+            "customer_name": order.customer_name,
+            "phone_number": order.phone_number,
+            "address": order.address,
+            "latitude": str(order.latitude) if order.latitude else None,
+            "longitude": str(order.longitude) if order.longitude else None,
+            "deleviry_type": order.deleviry_type,
+            "price": str(order.amount),
+            "status": order.status,
+       
+        },
+        "items": items,
+        "total": str(total)
+    })
+@csrf_exempt
+@login_required
+def update_order_status(request):
+    if request.method == 'POST':
+        try:
+            import json
+            data = json.loads(request.body.decode('utf-8'))
+            order_id = data.get('id')
+
+            order = Order.objects.get(id=order_id)
+            status = order.status
+            if status == OrderStatus.OUT_FOR_DELIVERY:
+                order.status = OrderStatus.DELIVERED
+                order.save()
+                return JsonResponse({'success': True, 'message': 'Order status updated to Delivered.'})
+            else:
+                return JsonResponse({'success': False, 'message': 'Invalid status update.'})
+        except Order.DoesNotExist:
+            return JsonResponse({'success': False, 'message': 'Order not found.'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'message': str(e)})
+    return JsonResponse({'success': False, 'message': 'Invalid request method.'})
+
+
+def order_history(request):
+    # Faqat kerakli statusdagilar
+    orders = (
+        Order.objects.filter(status__in=[
+            OrderStatus.OUT_FOR_DELIVERY,
+            OrderStatus.DELIVERED,
+            OrderStatus.CANCELLED
+        ])
+        .annotate(date=TruncDate('created_at'))
+        .order_by('-created_at', '-id')
+    )
+
+    # Sanalar bo‘yicha guruhlash
+    grouped = {}
+    for order in orders:
+        if order.date not in grouped:
+            grouped[order.date] = []
+        grouped[order.date].append(order)
+
+    # Paginatsiya (10 ta sana bir sahifada)
+    all_dates = list(grouped.keys())
+    paginator = Paginator(all_dates, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    paginated = {d: grouped[d] for d in page_obj.object_list}
+
+    context = {
+        'orders_by_date': paginated,
+        'page_obj': page_obj,
+    }
+    return render(request, 'deliver/history.html', context)
+

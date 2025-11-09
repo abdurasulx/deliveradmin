@@ -1,0 +1,79 @@
+<!-- ========== DETAIL MODAL (Yangi chiroyli variant) ========== -->
+<div id="detailModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-50 p-4">
+  <div class="bg-white rounded-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] shadow-lg">
+    <!-- Header -->
+    <div class="flex items-center justify-between px-4 py-3 border-b">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white text-lg font-semibold" id="detailAvatar">👤</div>
+        <div>
+          <div id="detailCustomerName" class="text-lg font-semibold text-gray-800">—</div>
+          <a id="detailPhone" href="#" class="text-sm text-blue-600 mt-0">—</a>
+        </div>
+      </div>
+      <button aria-label="Close" id="closeDetailBtn" class="text-gray-500 hover:text-gray-700">&times;</button>
+    </div>
+    <!-- Body -->
+    <div id="detailBody" class="p-4 overflow-auto">
+      <!-- loader -->
+      <div id="detailLoader" class="flex items-center justify-center py-10">
+        <svg class="animate-spin h-8 w-8 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+        </svg>
+      </div>
+      <!-- content (to be filled by JS) -->
+      <div id="detailContent" class="hidden space-y-4">
+        <!-- status & type -->
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <span id="detailStatusBadge" class="inline-flex items-center px-2 py-1 rounded-full text-sm font-medium"></span>
+            <span id="detailTypeBadge" class="inline-flex items-center px-2 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-700">—</span>
+          </div>
+          <div class="text-sm text-gray-500" id="detailCreatedAt">—</div>
+        </div>
+        <!-- Address + map buttons -->
+        <div class="bg-gray-50 rounded-lg p-3">
+          <div class="text-sm text-gray-600 mb-2">📍 Manzil</div>
+          <div id="detailAddress" class="text-gray-800 font-medium break-words">—</div>
+          <div id="mapButtons" class="mt-3 flex flex-wrap gap-2"></div>
+        </div>
+        <!-- Items list -->
+        <div>
+          <div class="text-sm text-gray-600 mb-2">🧾 Mahsulotlar</div>
+          <ul id="detailItems" class="divide-y rounded-md overflow-hidden bg-white border">
+            <!-- JS will append li elements -->
+          </ul>
+        </div>
+        <!-- Summary -->
+        <div class="flex items-center justify-between pt-3 border-t">
+          <div class="text-sm text-gray-600">Jami</div>
+          <div id="detailTotal" class="text-lg font-bold text-gray-800">0.00</div>
+        </div>
+        <!-- Delivery comment -->
+        <div id="detailCommentWrap" class="mt-2">
+          <div class="text-sm text-gray-600">Yetkazuvchi izohi</div>
+          <div id="detailComment" class="text-gray-800">—</div>
+        </div>
+      </div>
+      <!-- Error -->
+      <div id="detailError" class="hidden text-center text-red-600 py-6">Batafsil ma'lumotni yuklab bo'lmadi.</div>
+    </div>
+    <!-- Footer actions -->
+    <div class="px-4 py-3 border-t flex items-center justify-between gap-3">
+      <div class="text-sm text-gray-500" id="detailIdLabel">#—</div>
+      <div  class="flex items-center gap-2">
+        <a  id="detailCallBtn" href="#" class="hidden px-3 py-2 bg-blue-600 text-white rounded-lg text-sm">📞 Qo'ng'iroq</a>
+        <a   id="detailRouteBtn" href="#" target="_blank" class="hidden px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm">🗺 Yo'nalish</a>
+        <button id="detailCloseBtn" class="px-3 py-2 bg-gray-100 rounded-lg text-sm">Yopish</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Styles: small animation -->
+<style>
+  @keyframes slideIn {
+    from { transform: translateY(8px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  #detailModal .rounded-2xl { animation: slideIn 0.18s ease; }
+</style>

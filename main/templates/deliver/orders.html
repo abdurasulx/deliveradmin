@@ -1,0 +1,417 @@
+{% extends 'deliver/base.html' %}
+{% load static %}
+{% block title %}Buyurtmalar - Yetkazib beruvchi tizimi{% endblock %}
+{% block content %}
+<!-- SweetAlert2 (CDN orqali) -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<div class="container mx-auto p-4">
+  <h1 class="text-2xl font-bold text-center mb-4">Buyurtmalar</h1>
+  <!-- Filter Buttons -->
+  <div class="flex justify-center gap-3 mb-6">
+    <button class="tab-btn bg-blue-500 text-white px-4 py-2 rounded-md active" data-target="active-orders">
+      Faol
+    </button>
+    <button class="tab-btn bg-gray-200 text-gray-700 px-4 py-2 rounded-md" data-target="delivered-orders">
+      Topshirilgan
+    </button>
+    <button class="tab-btn bg-gray-200 text-gray-700 px-4 py-2 rounded-md" data-target="canceled-orders">
+      Bekor qilingan
+    </button>
+  </div>
+  <!-- Faol buyurtmalar -->
+  <div id="active-orders" class="order-section block">
+    {% for order in active_orders %}
+    <div class="bg-white shadow-md rounded-lg p-4 mb-4 border">
+      <p class="font-semibold text-lg">{{ order.customer_name }}</p>
+      <p class="text-gray-600">📞 {{ order.phone_number }}</p>
+      <p class="text-gray-600">🚚 Turi: {{ order.deleviry_type }}</p>
+      <p class="text-gray-600">📍 {{ order.address }}</p>
+      <div class="flex justify-between mt-3">
+        <button class="bg-blue-500 text-white px-3 py-1 rounded-md" onclick="openDetailModal('{{ order.id }}')">
+          Batafsil
+        </button>
+        <button class="bg-green-500 text-white px-3 py-1 rounded-md" onclick="confirmDelivery('{{ order.id }}')">
+          ✅ Topshirildi
+        </button>
+      </div>
+    </div>
+    {% empty %}
+      <p class="text-center text-gray-500">Faol buyurtmalar yo‘q</p>
+    {% endfor %}
+  </div>
+  <!-- Topshirilgan -->
+  <div id="delivered-orders" class="order-section hidden">
+    {% for order in delivered_orders %}
+    <div class="bg-green-50 shadow-sm rounded-lg p-4 mb-4 border border-green-300">
+      <p class="font-semibold text-lg">{{ order.customer_name }}</p>
+      <p class="text-gray-600">📞 {{ order.phone_number }}</p>
+      <p class="text-gray-600">📍 {{ order.address }}</p>
+      <p class="text-gray-600 font-medium">💰 {{ order.amount }} so'm</p>
+    </div>
+    {% empty %}
+      <p class="text-center text-gray-500">Topshirilgan buyurtmalar yo‘q</p>
+    {% endfor %}
+  </div>
+  <!-- Bekor qilingan -->
+  <div id="canceled-orders" class="order-section hidden">
+    {% for order in canceled_orders %}
+    <div class="bg-red-50 shadow-sm rounded-lg p-4 mb-4 border border-red-300">
+      <p class="font-semibold text-lg">{{ order.customer_name }}</p>
+      <p class="text-gray-600">📞 {{ order.phone_number }}</p>
+      <p class="text-gray-600">📍 {{ order.address }}</p>
+      <p class="text-red-600 font-medium">❌ Bekor qilingan</p>
+    </div>
+    {% empty %}
+      <p class="text-center text-gray-500">Bekor qilingan buyurtmalar yo‘q</p>
+    {% endfor %}
+  </div>
+</div>
+<!-- ✅ Confirm Modal -->
+<div id="confirmModal" class="fixed inset-0 bg-black bg-opacity-40 hidden items-center justify-center z-50">
+  <div class="bg-white rounded-lg shadow-lg w-11/12 max-w-sm p-6 animate-fadeIn">
+    <h2 class="text-xl font-semibold mb-2 text-gray-800">Tasdiqlaysizmi?</h2>
+    <p class="text-gray-600 mb-4">Bu buyurtmani topshirilgan deb belgilamoqchimisiz?</p>
+    <div class="flex justify-end space-x-3">
+      <button id="cancelBtn" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">
+        Bekor qilish
+      </button>
+      <button id="confirmBtn" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600">
+        Ha, topshirildi
+      </button>
+    </div>
+  </div>
+</div>
+<!-- ========== DETAIL MODAL (Yangi chiroyli variant) ========== -->
+<div id="detailModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-50 p-4">
+  <div class="bg-white rounded-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] shadow-lg">
+    <!-- Header -->
+    <div class="flex items-center justify-between px-4 py-3 border-b">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white text-lg font-semibold" id="detailAvatar">👤</div>
+        <div>
+          <div id="detailCustomerName" class="text-lg font-semibold text-gray-800">—</div>
+          <a id="detailPhone" href="#" class="text-sm text-blue-600 mt-0">—</a>
+        </div>
+      </div>
+      <button aria-label="Close" id="closeDetailBtn" class="text-gray-500 hover:text-gray-700">&times;</button>
+    </div>
+    <!-- Body -->
+    <div id="detailBody" class="p-4 overflow-auto">
+      <!-- loader -->
+      <div id="detailLoader" class="flex items-center justify-center py-10">
+        <svg class="animate-spin h-8 w-8 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+        </svg>
+      </div>
+      <!-- content (to be filled by JS) -->
+      <div id="detailContent" class="hidden space-y-4">
+        <!-- status & type -->
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <span id="detailStatusBadge" class="inline-flex items-center px-2 py-1 rounded-full text-sm font-medium"></span>
+            <span id="detailTypeBadge" class="inline-flex items-center px-2 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-700">—</span>
+          </div>
+          <div class="text-sm text-gray-500" id="detailCreatedAt">—</div>
+        </div>
+        <!-- Address + map buttons -->
+        <div class="bg-gray-50 rounded-lg p-3">
+          <div class="text-sm text-gray-600 mb-2">📍 Manzil</div>
+          <div id="detailAddress" class="text-gray-800 font-medium break-words">—</div>
+          <div id="mapButtons" class="mt-3 flex flex-wrap gap-2"></div>
+        </div>
+        <!-- Items list -->
+        <div>
+          <div class="text-sm text-gray-600 mb-2">🧾 Mahsulotlar</div>
+          <ul id="detailItems" class="divide-y rounded-md overflow-hidden bg-white border">
+            <!-- JS will append li elements -->
+          </ul>
+        </div>
+        <!-- Summary -->
+        <div class="flex items-center justify-between pt-3 border-t">
+          <div class="text-sm text-gray-600">Jami</div>
+          <div id="detailTotal" class="text-lg font-bold text-gray-800">0.00</div>
+        </div>
+        <!-- Delivery comment -->
+        <div id="detailCommentWrap" class="mt-2">
+          <div class="text-sm text-gray-600">Yetkazuvchi izohi</div>
+          <div id="detailComment" class="text-gray-800">—</div>
+        </div>
+      </div>
+      <!-- Error -->
+      <div id="detailError" class="hidden text-center text-red-600 py-6">Batafsil ma'lumotni yuklab bo'lmadi.</div>
+    </div>
+    <!-- Footer actions -->
+    <div class="px-4 py-3 border-t flex items-center justify-between gap-3">
+      <div class="text-sm text-gray-500" id="detailIdLabel">#—</div>
+      <div class="flex items-center gap-2">
+        <a id="detailCallBtn" href="#" class="hidden px-3 py-2 bg-blue-600 text-white rounded-lg text-sm">📞 Qo'ng'iroq</a>
+        <a id="detailRouteBtn" href="#" target="_blank" class="hidden px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm">🗺 Yo'nalish</a>
+        <button id="detailCloseBtn" class="px-3 py-2 bg-gray-100 rounded-lg text-sm">Yopish</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Styles: small animation -->
+<style>
+  @keyframes slideIn {
+    from { transform: translateY(8px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  #detailModal .rounded-2xl { animation: slideIn 0.18s ease; }
+</style>
+<!-- JS: fetch va render -->
+<script>
+  // CSRF token olish funksiyasi
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+  const csrftoken = getCookie('csrftoken');
+
+  let currentDetailOrderId = null;
+
+  function openDetailModal(orderId) {
+    currentDetailOrderId = orderId;
+    const modal = document.getElementById('detailModal');
+    document.getElementById('detailLoader').classList.remove('hidden');
+    document.getElementById('detailContent').classList.add('hidden');
+    document.getElementById('detailError').classList.add('hidden');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+
+    const url = "{% url 'order_detail_json' 0 %}".replace('/0/', '/' + orderId + '/');
+    
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrftoken
+      },
+      body: JSON.stringify({ order_id: orderId })
+    })
+    .then(res => {
+      if (!res.ok) throw new Error('Server javob bermadi');
+      return res.json();
+    })
+    .then(data => renderDetail(data))
+    .catch(err => {
+      console.error(err);
+      document.getElementById('detailLoader').classList.add('hidden');
+      document.getElementById('detailError').classList.remove('hidden');
+    });
+  }
+
+  function renderDetail(data) {
+    const order = data.order || {};
+    const items = data.items || [];
+    const total = data.total || "0.00";
+
+    document.getElementById('detailCustomerName').textContent = order.customer_name || '—';
+    const phoneEl = document.getElementById('detailPhone');
+    if (order.phone_number) {
+      phoneEl.href = 'tel:' + order.phone_number;
+      phoneEl.textContent = order.phone_number;
+      document.getElementById('detailCallBtn').href = 'tel:' + order.phone_number;
+      document.getElementById('detailCallBtn').classList.remove('hidden');
+    } else {
+      phoneEl.removeAttribute('href');
+      phoneEl.textContent = 'Telefon yo‘q';
+      document.getElementById('detailCallBtn').classList.add('hidden');
+    }
+
+    const avatar = document.getElementById('detailAvatar');
+    const initials = (order.customer_name || '').split(' ').map(s=>s[0]).join('').slice(0,2).toUpperCase();
+    avatar.textContent = initials || '👤';
+
+    const statusBadge = document.getElementById('detailStatusBadge');
+    const status = (order.status || '').toLowerCase();
+    statusBadge.textContent = (status || '—').toUpperCase();
+    statusBadge.className = 'inline-flex items-center px-2 py-1 rounded-full text-sm font-medium';
+    if (status.includes('delivered')) statusBadge.classList.add('bg-green-100','text-green-700');
+    else if (status.includes('out_for_delivery') || status.includes('processing') || status.includes('pending')) statusBadge.classList.add('bg-yellow-100','text-yellow-700');
+    else if (status.includes('cancelled') || status.includes('rejected')) statusBadge.classList.add('bg-red-100','text-red-700');
+    else statusBadge.classList.add('bg-gray-100','text-gray-700');
+
+    const typeBadge = document.getElementById('detailTypeBadge');
+    typeBadge.textContent = order.deleviry_type ? String(order.deleviry_type).toUpperCase() : '-';
+    document.getElementById('detailCreatedAt').textContent = order.created_at || '';
+    document.getElementById('detailAddress').textContent = order.address || 'Manzil yo‘q';
+
+    const mapButtons = document.getElementById('mapButtons');
+    mapButtons.innerHTML = '';
+    if (order.latitude && order.longitude) {
+      const gmaps = `https://www.google.com/maps/search/?api=1&query=${order.latitude},${order.longitude}`;
+      const ymaps = `https://yandex.com/maps/?whatshere%5Bpoint%5D=${order.longitude},${order.latitude}&whatshere%5Bzoom%5D=16`;
+      mapButtons.innerHTML = `
+        <a  href="${gmaps}" target="_blank" class="px-3 py-2 rounded-lg border text-sm inline-block">Google Maps</a>
+        <a  href="${ymaps}" target="_blank" class="px-3 py-2 rounded-lg border text-sm inline-block">Yandex Maps</a>
+        <button onclick="copyAddress()" class="px-3 py-2 rounded-lg border text-sm inline-block">Manzilni nusxalash</button>
+      `;
+      document.getElementById('detailRouteBtn').href = gmaps;
+      document.getElementById('detailRouteBtn').classList.remove('hidden');
+    } else {
+      mapButtons.innerHTML = `<div class="text-sm text-gray-500">Koordinatalar mavjud emas</div>
+                              <button onclick="copyAddress()" class="mt-2 px-3 py-2 rounded-lg border text-sm">Manzilni nusxalash</button>`;
+      document.getElementById('detailRouteBtn').classList.add('hidden');
+    }
+
+    const ul = document.getElementById('detailItems');
+    ul.innerHTML = '';
+    if (items.length) {
+      items.forEach(it => {
+        const li = document.createElement('li');
+        li.className = 'flex items-center justify-between px-3 py-2';
+        const left = document.createElement('div');
+        left.className = 'text-sm';
+        left.innerHTML = `<div class="font-medium">${it.product_name || 'Noma\'lum'}</div>
+                          <div class="text-xs text-gray-500">x${it.quantity} — ${it.price}</div>`;
+        const right = document.createElement('div');
+        right.className = 'text-sm font-medium';
+        right.textContent = it.total_price || '0.00';
+        li.appendChild(left);
+        li.appendChild(right);
+        ul.appendChild(li);
+      });
+    } else {
+      const li = document.createElement('li');
+      li.className = 'px-3 py-3 text-sm text-gray-500';
+      li.textContent = 'Buyurtma mahsuloti topilmadi.';
+      ul.appendChild(li);
+    }
+
+    document.getElementById('detailTotal').textContent = total;
+    document.getElementById('detailComment').textContent = order.delivery_person_comment || '—';
+    document.getElementById('detailCommentWrap').style.display = order.delivery_person_comment ? 'block' : 'none';
+    document.getElementById('detailIdLabel').textContent = '#' + (order.id || '');
+    document.getElementById('detailLoader').classList.add('hidden');
+    document.getElementById('detailContent').classList.remove('hidden');
+  }
+
+  function copyAddress() {
+    const addr = document.getElementById('detailAddress').textContent || '';
+    if (!addr) return;
+    navigator.clipboard?.writeText(addr).then(() => {
+      const t = document.createElement('div');
+      t.className = 'fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-lg';
+      t.textContent = 'Manzil nusxalandi';
+      document.body.appendChild(t);
+      setTimeout(()=> t.remove(), 1800);
+    }).catch(()=> alert('Nusxalash qo‘llab-quvvatlanmadi'));
+  }
+
+  document.getElementById('closeDetailBtn').addEventListener('click', closeDetailModal);
+  document.getElementById('detailCloseBtn').addEventListener('click', closeDetailModal);
+
+  function closeDetailModal() {
+    const modal = document.getElementById('detailModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    document.getElementById('detailContent').classList.add('hidden');
+    document.getElementById('detailLoader').classList.remove('hidden');
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeDetailModal();
+  });
+</script>
+
+<style>
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+.animate-fadeIn {
+  animation: fadeIn 0.25s ease-in-out;
+}
+</style>
+<script>
+let selectedOrderId = null;
+function confirmDelivery(orderId) {
+  selectedOrderId = orderId;
+  const modal = document.getElementById("confirmModal");
+  modal.classList.remove("hidden");
+  modal.classList.add("flex");
+}
+document.getElementById("cancelBtn").addEventListener("click", () => {
+  const modal = document.getElementById("confirmModal");
+  modal.classList.add("hidden");
+  modal.classList.remove("flex");
+});
+document.getElementById("confirmBtn").addEventListener("click", () => {
+  const modal = document.getElementById("confirmModal");
+  modal.classList.add("hidden");
+  modal.classList.remove("flex");
+// 🔥 Bu yerda siz AJAX bilan statusni o‘zgartirishingiz mumkin
+// Masalan:
+
+
+fetch('/update_order_status/', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-CSRFToken': '{{ csrf_token }}', // Django CSRF himoyasi uchun
+  },
+  body: JSON.stringify({
+    id: selectedOrderId,           // Tanlangan buyurtma ID
+    status: 'OUT_FOR_DELIVERY'     // Yuborilayotgan holat
+  })
+})
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      console.log('✅', data.message);
+      alert('Buyurtma holati muvaffaqiyatli yangilandi!');
+    } else {
+      console.warn('⚠️', data.message);
+      alert('Xatolik: ' + data.message);
+    }
+  })
+  .catch(err => {
+    console.error('❌ Xatolik yuz berdi:', err);
+  });
+
+
+// Demo uchun:
+
+
+  const toast = document.createElement('div');
+  toast.innerHTML = "✅ Buyurtma topshirildi!";
+  toast.className = "fixed bottom-5 right-5 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg animate-fadeIn";
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+  location.reload(); // Sahifani yangilash
+
+});
+</script>
+<!-- JavaScript -->
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const tabs = document.querySelectorAll(".tab-btn");
+  const sections = document.querySelectorAll(".order-section");
+  tabs.forEach(btn => {
+    btn.addEventListener("click", () => {
+      tabs.forEach(b => b.classList.remove("active", "bg-blue-500", "text-white"));
+      btn.classList.add("active", "bg-blue-500", "text-white");
+      btn.classList.remove("bg-gray-200", "text-gray-700");
+      sections.forEach(sec => sec.classList.add("hidden"));
+      document.getElementById(btn.dataset.target).classList.remove("hidden");
+    });
+  });
+           } );
+
+</script>
+
+
+{% endblock %}

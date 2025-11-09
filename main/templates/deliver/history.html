@@ -1,0 +1,244 @@
+{% extends 'deliver/base.html' %}
+{% block title %}Buyurtmalar tarixi{% endblock %}
+{% block content %}
+<div class="p-6">
+  <h1 class="text-2xl font-bold mb-5">📜 Buyurtmalar tarixi</h1>
+
+  {% for date, orders in orders_by_date.items %}
+    <h2 class="text-lg font-semibold text-blue-700 mb-3">
+      {{ date|date:"j F Y" }}
+    </h2>
+
+    {% for order in orders %}
+      <div class="shadow-md rounded-lg p-4 mb-4 border
+        {% if order.status == 'out_for_delivery' %} bg-blue-50 border-blue-300
+        {% elif order.status == 'delivered' %} bg-green-50 border-green-300
+        {% elif order.status == 'cancelled' %} bg-red-50 border-red-300
+        {% else %} bg-gray-50 border-gray-300
+        {% endif %}
+      ">
+        <p class="font-semibold text-lg">{{ order.customer_name }}</p>
+        <p class="text-gray-600">📞 {{ order.phone_number }}</p>
+        <p class="text-gray-600">🚚 Turi: {{ order.get_deleviry_type_display }}</p>
+        <p class="text-gray-600">📍 {{ order.address }}</p>
+
+        <div class="flex justify-between mt-3">
+          <button class="bg-blue-500 text-white px-3 py-1 rounded-md"
+                  onclick="openDetailModal('{{ order.id }}')">
+            Batafsil
+          </button>
+
+          {% if order.status == 'out_for_delivery' %}
+            <button class="bg-yellow-500 text-white px-3 py-1 rounded-md" disabled>
+              Yetkazilmoqda
+            </button>
+          {% elif order.status == 'delivered' %}
+            <button class="bg-green-500 text-white px-3 py-1 rounded-md" disabled>
+              ✅ Yetkazildi
+            </button>
+          {% elif order.status == 'cancelled' %}
+            <button class="bg-red-500 text-white px-3 py-1 rounded-md" disabled>
+              ❌ Bekor qilingan
+            </button>
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  {% endfor %}
+
+  <!-- PAGINATION -->
+  <div class="flex justify-center mt-8 space-x-2">
+    {% if page_obj.has_previous %}
+      <a href="?page={{ page_obj.previous_page_number }}" class="px-3 py-1 bg-gray-200 rounded-md">⬅️ Oldingi</a>
+    {% endif %}
+    <span class="px-3 py-1 bg-gray-100 rounded-md">
+      Sahifa {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+    </span>
+    {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}" class="px-3 py-1 bg-gray-200 rounded-md">Keyingi ➡️</a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- DETAIL MODAL -->
+{% include 'deliver/modal.html' %}
+<!-- JS: fetch va render -->
+<script>
+  // CSRF token olish funksiyasi
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+  const csrftoken = getCookie('csrftoken');
+
+  let currentDetailOrderId = null;
+
+  function openDetailModal(orderId) {
+    currentDetailOrderId = orderId;
+    const modal = document.getElementById('detailModal');
+    document.getElementById('detailLoader').classList.remove('hidden');
+    document.getElementById('detailContent').classList.add('hidden');
+    document.getElementById('detailError').classList.add('hidden');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+
+    const url = "{% url 'order_detail_json' 0 %}".replace('/0/', '/' + orderId + '/');
+    
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrftoken
+      },
+      body: JSON.stringify({ order_id: orderId })
+    })
+    .then(res => {
+      if (!res.ok) throw new Error('Server javob bermadi');
+      return res.json();
+    })
+    .then(data => renderDetail(data))
+    .catch(err => {
+      console.error(err);
+      document.getElementById('detailLoader').classList.add('hidden');
+      document.getElementById('detailError').classList.remove('hidden');
+    });
+  }
+
+  function renderDetail(data) {
+    const order = data.order || {};
+    const items = data.items || [];
+    const total = data.total || "0.00";
+
+    document.getElementById('detailCustomerName').textContent = order.customer_name || '—';
+    const phoneEl = document.getElementById('detailPhone');
+    if (order.phone_number) {
+      phoneEl.href = 'tel:' + order.phone_number;
+      phoneEl.textContent = order.phone_number;
+      document.getElementById('detailCallBtn').href = 'tel:' + order.phone_number;
+      document.getElementById('detailCallBtn')
+    } else {
+      phoneEl.removeAttribute('href');
+      phoneEl.textContent = 'Telefon yo‘q';
+      document.getElementById('detailCallBtn')
+    }
+
+    const avatar = document.getElementById('detailAvatar');
+    const initials = (order.customer_name || '').split(' ').map(s=>s[0]).join('').slice(0,2).toUpperCase();
+    avatar.textContent = initials || '👤';
+
+    const statusBadge = document.getElementById('detailStatusBadge');
+    const status = (order.status || '').toLowerCase();
+    statusBadge.textContent = (status || '—').toUpperCase();
+    statusBadge.className = 'inline-flex items-center px-2 py-1 rounded-full text-sm font-medium';
+    if (status.includes('delivered')) statusBadge.classList.add('bg-green-100','text-green-700');
+    else if (status.includes('out_for_delivery') || status.includes('processing') || status.includes('pending')) statusBadge.classList.add('bg-yellow-100','text-yellow-700');
+    else if (status.includes('cancelled') || status.includes('rejected')) statusBadge.classList.add('bg-red-100','text-red-700');
+    else statusBadge.classList.add('bg-gray-100','text-gray-700');
+
+    const typeBadge = document.getElementById('detailTypeBadge');
+    typeBadge.textContent = order.deleviry_type ? String(order.deleviry_type).toUpperCase() : '-';
+    document.getElementById('detailCreatedAt').textContent = order.created_at || '';
+    document.getElementById('detailAddress').textContent = order.address || 'Manzil yo‘q';
+
+    const mapButtons = document.getElementById('mapButtons');
+    mapButtons.innerHTML = '';
+    if (order.latitude && order.longitude) {
+      const gmaps = `https://www.google.com/maps/search/?api=1&query=${order.latitude},${order.longitude}`;
+      const ymaps = `https://yandex.com/maps/?whatshere%5Bpoint%5D=${order.longitude},${order.latitude}&whatshere%5Bzoom%5D=16`;
+      mapButtons.innerHTML = `
+        <a disabled href="${gmaps}" target="_blank" class="px-3 py-2 rounded-lg border text-sm inline-block">Google Maps</a>
+        <a disabled  href="${ymaps}" target="_blank" class="px-3 py-2 rounded-lg border text-sm inline-block">Yandex Maps</a>
+        <button onclick="copyAddress()" class="px-3 py-2 rounded-lg border text-sm inline-block">Manzilni nusxalash</button>
+      `;
+      
+      document.getElementById('detailRouteBtn').href = gmaps;
+      document.getElementById('detailRouteBtn')
+    } else {
+      mapButtons.innerHTML = `<div class="text-sm text-gray-500">Koordinatalar mavjud emas</div>
+                              <button onclick="copyAddress()" class="mt-2 px-3 py-2 rounded-lg border text-sm">Manzilni nusxalash</button>`;
+      document.getElementById('detailRouteBtn')
+    }
+
+    const ul = document.getElementById('detailItems');
+    ul.innerHTML = '';
+    if (items.length) {
+      items.forEach(it => {
+        const li = document.createElement('li');
+        li.className = 'flex items-center justify-between px-3 py-2';
+        const left = document.createElement('div');
+        left.className = 'text-sm';
+        left.innerHTML = `<div class="font-medium">${it.product_name || 'Noma\'lum'}</div>
+                          <div class="text-xs text-gray-500">x${it.quantity} — ${it.price}</div>`;
+        const right = document.createElement('div');
+        right.className = 'text-sm font-medium';
+        right.textContent = it.total_price || '0.00';
+        li.appendChild(left);
+        li.appendChild(right);
+        ul.appendChild(li);
+      });
+    } else {
+      const li = document.createElement('li');
+      li.className = 'px-3 py-3 text-sm text-gray-500';
+      li.textContent = 'Buyurtma mahsuloti topilmadi.';
+      ul.appendChild(li);
+    }
+
+    document.getElementById('detailTotal').textContent = total;
+    document.getElementById('detailComment').textContent = order.delivery_person_comment || '—';
+    document.getElementById('detailCommentWrap').style.display = order.delivery_person_comment ? 'block' : 'none';
+    document.getElementById('detailIdLabel').textContent = '#' + (order.id || '');
+    document.getElementById('detailLoader').classList.add('hidden');
+    document.getElementById('detailContent').classList.remove('hidden');
+  }
+
+  function copyAddress() {
+    const addr = document.getElementById('detailAddress').textContent || '';
+    if (!addr) return;
+    navigator.clipboard?.writeText(addr).then(() => {
+      const t = document.createElement('div');
+      t.className = 'fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-lg';
+      t.textContent = 'Manzil nusxalandi';
+      document.body.appendChild(t);
+      setTimeout(()=> t.remove(), 1800);
+    }).catch(()=> alert('Nusxalash qo‘llab-quvvatlanmadi'));
+  }
+
+  document.getElementById('closeDetailBtn').addEventListener('click', closeDetailModal);
+  document.getElementById('detailCloseBtn').addEventListener('click', closeDetailModal);
+
+  function closeDetailModal() {
+    const modal = document.getElementById('detailModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    document.getElementById('detailContent').classList.add('hidden');
+    document.getElementById('detailLoader').classList.remove('hidden');
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeDetailModal();
+  });
+</script>
+
+<style>
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+.animate-fadeIn {
+  animation: fadeIn 0.25s ease-in-out;
+}
+</style>
+
+{% endblock %}
+
+

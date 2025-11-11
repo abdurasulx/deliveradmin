@@ -373,6 +373,7 @@ fetch("{% url 'update_order_status' %}", {
     if (data.success) {
       console.log('✅', data.message);
       alert('Buyurtma holati muvaffaqiyatli yangilandi!');
+      location.reload()
     } else {
       console.warn('⚠️', data.message);
       alert('Xatolik: ' + data.message);

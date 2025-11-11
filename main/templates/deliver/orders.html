@@ -357,7 +357,7 @@ document.getElementById("confirmBtn").addEventListener("click", () => {
 // Masalan:
 
 
-fetch('/update_order_status/', {
+fetch("{% url 'update_order_status' %}", {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -412,6 +412,44 @@ document.addEventListener("DOMContentLoaded", function() {
            } );
 
 </script>
+
+<script>
+  let lastOrder = null; // Oxirgi order id shu yerda saqlanadi
+
+  // Serverdan so‘nggi faol orderni olish funksiyasi
+  async function fetchLastOrder() {
+    try {
+      const response = await fetch("{% url 'last_order' %}"); // Django'da yozgan view'ning URL manzili
+      const data = await response.json();
+
+      // data.id bu siz qaytargan JsonResponse({'id': last_id yoki None})
+      return data.id;
+    } catch (error) {
+      console.error('Xato:', error);
+      return null;
+    }
+  }
+
+  // Dastlab sahifa yuklanganda ishga tushadi
+  async function initOrderWatcher() {
+    lastOrder = await fetchLastOrder(); // Boshlang‘ich qiymatni yuklaydi
+    console.log('Boshlang‘ich order:', lastOrder);
+
+    // Har 2 soniyada tekshiradi
+    setInterval(async () => {
+      const newOrder = await fetchLastOrder();
+
+      if (newOrder !== lastOrder) {
+        console.log('Yangi order topildi:', newOrder);
+        location.reload(); // Sahifani yangilaydi
+      }
+    }, 2000);
+  }
+
+  // Sahifa tayyor bo‘lganda ishga tushadi
+  document.addEventListener('DOMContentLoaded', initOrderWatcher);
+</script>
+
 
 
 {% endblock %}

@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
-from .func import  transliterate_to_krill
+
 
 
 class Category(models.Model):

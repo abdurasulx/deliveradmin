@@ -13,7 +13,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.views.decorators.csrf import csrf_exempt
 import requests
 from django.utils import timezone
-from .forms import EmployeeProfileForm
+
 
 from django.core.paginator import Paginator
 from django.db.models.functions import TruncDate
@@ -36,10 +36,7 @@ def login_view(request):
 
     return render(request, "auth/login.html")
 
-@login_required(login_url='login')
-def logout_view(request):
-    logout(request)
-    return redirect('login')
+
 @login_required(login_url='login')
 def home(request):
     usr=Employee.objects.get(user=request.user)
@@ -75,33 +72,10 @@ def order_mark_delivered(request, order_id):
         messages.success(request, "Buyurtma topshirildi!")
         return redirect('home')
 @login_required(login_url='login')
-def deliver_dashboard(request):
-    try:
-        deliver = Employee.objects.get(user=request.user, role='supplier')
-    except Employee.DoesNotExist:
-        messages.error(request, "Sizda yetkazib beruvchi huquqi yo‘q!")
-        return redirect('dashboard')
-
-    orders = Order.objects.filter(deliver=deliver).order_by('-created_at')
-    return render(request, 'deliver/dashboard.html', {'orders': orders})
 
 
-@login_required(login_url='login')
-def submit_order(request, order_id):
-    order = get_object_or_404(Order, id=order_id)
 
-    if not hasattr(request.user, 'employee') or request.user.employee.role != 'supplier':
-        messages.error(request, "Siz bu amalni bajara olmaysiz.")
-        return redirect('dashboard')
-
-    if order.deliver.user != request.user:
-        messages.error(request, "Bu buyurtma sizga tegishli emas.")
-        return redirect('deliver_dashboard')
-
-    order.status = 'submitted'
-    order.save()
-    messages.success(request, "✅ Buyurtma topshirildi.")
-    return redirect('deliver_dashboard')    
+  
 # Create your views here.
 @login_required(login_url='login')
 def products_view(request):
@@ -413,61 +387,7 @@ def assign_order(request):
         order.status = "submitted"
         order.save()
     return redirect('orders_view')
-@login_required(login_url='login')
-@require_POST
-def assign_deliver(request):
-    order_id = request.POST.get('order_id')
-    deliver_id = request.POST.get('deliver_id')
 
-    try:
-        order = ConOrder.objects.get(id=order_id)
-        deliver = Employee.objects.get(id=deliver_id)
-        order.deliver = deliver
-        order.status = 'submitted'  # topshirildi
-        order.save()
-        return JsonResponse({'success': True})
-    except ConOrder.DoesNotExist:
-        return JsonResponse({'success': False, 'error': 'Buyurtma topilmadi!'})
-    except Employee.DoesNotExist:
-        return JsonResponse({'success': False, 'error': 'Yetkazib beruvchi topilmadi!'})
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)})
-
-@csrf_exempt
-def send_telegram_message(request):
-    if request.method == "GET":
-        # HTML sahifani qaytarish
-        return render(request, "admin/send_telegram.html")
-
-    elif request.method == "POST":
-        bot_token = request.POST.get("bot_token")
-        message = request.POST.get("message")
-        image = request.FILES.get("image")
-
-        if not bot_token or not message:
-            return JsonResponse({"success": False, "error": "Token yoki xabar matni kiritilmagan!"})
-
-        users = Customer.objects.exclude(telegram_id__isnull=True)
-        sent_count = 0
-
-        for user in users:
-            chat_id = user.telegram_id
-            try:
-                if image:
-                    files = {'photo': image.read()}
-                    data = {'chat_id': chat_id, 'caption': message}
-                    requests.post(f'https://api.telegram.org/bot{bot_token}/sendPhoto', data=data, files=files)
-                else:
-                    requests.post(f'https://api.telegram.org/bot{bot_token}/sendMessage',
-                                  data={'chat_id': chat_id, 'text': message})
-                sent_count += 1
-            except Exception as e:
-                print(f"Xabar yuborishda xatolik: {e}")
-
-        return JsonResponse({"success": True, "count": sent_count})
-
-    else:
-        return JsonResponse({"success": False, "error": "Faqat GET yoki POST ruxsat etilgan."})
 def get_orders_api(request,deliver_id):
     dlvr = get_object_or_404(Employee, id=deliver_id, role='supplier')
     orders = ConOrder.objects.filter(deliver=dlvr).values('id', 'orderlist__customer_name', 'delivery_address', 'status', 'created_at')
@@ -599,4 +519,22 @@ def order_history(request):
         'page_obj': page_obj,
     }
     return render(request, 'deliver/history.html', context)
+@login_required(login_url='login')
+def last_orders(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'not_authenticated'}, status=401)
 
+    last_order = (
+        Order.objects.filter(
+            delivery_person=request.user,
+            status=OrderStatus.OUT_FOR_DELIVERY
+        )
+        .annotate(date=TruncDate('created_at'))
+        .order_by('-id')  # eng so‘nggi buyurtma birinchi bo‘ladi
+        .first()          # faqat bittasini olamiz
+    )
+
+    if not last_order:
+        return JsonResponse({'id': 'None'}, status=404)
+
+    return JsonResponse({'id': last_order.id})
